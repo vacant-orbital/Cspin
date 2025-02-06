@@ -1,0 +1,7 @@
+// RGP 06Nov2023 This program emulates wft command on varian -- effectively erasing the baseline correction, 
+// chemical shift reference, and integrals
+STOREPAR("SR",0.00)
+XAU("cz","");
+EF;
+PK;
+QUIT

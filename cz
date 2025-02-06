@@ -1,0 +1,26 @@
+// This should be similar to cz on Varian -- clears current integrals --RGP14Aug2023
+FILE *intfile;
+
+intfile=fopen(PROCPATH("intrng"), "w");
+int cuts1;
+
+if(intfile==NULL)
+{
+	Proc_err(DEF_ERR_OPT, "Can't write integrals:\n%s", PROCPATH("intrng"));
+	return(-1);
+}
+if (i_argv[2] !=NULL)
+{
+	for (cuts1 = 0; cuts1 < sizeof(i_argv[2])/sizeof(i_argv[2][0]); cuts1++)
+	{
+		printf("i_argv2[%d]", cuts1);
+	}
+}
+fprintf(intfile, "A 1.0 #regions in PPM\n");
+fprintf(intfile, "# low field   high field  bias        slope\n");
+fclose(intfile);
+//LI;
+VIEWDATA_SAMEWIN;
+XCMD("sendgui browse_update_tree");
+
+QUIT

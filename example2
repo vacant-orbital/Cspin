@@ -1,0 +1,86 @@
+/* potter 05Apr2023 */
+/* pds: calculates composition of 3,5-ditertbutyl-2-hydroxybenzoicaldehyde vs bisphenol A in DMSO-d6 solvent */
+/*--------------------------*/
+
+AUERR = pdsProc(curdat, cmd);
+QUIT
+
+#include <ex1Comp.c>
+#include <pBC.c>
+#include <pInteg.c>
+#include <pOut.c>
+#include <pPrint.c>
+#include <pstats.c>
+
+static int pdsProc(const char* curdat, const char* cmd)
+{
+	STOREPAR("LAYOUT", "+/PROTON_Ethicon.xwp");
+	STOREPAR("LB",0.2);
+	FILE *intfile, *outfile;
+	int i, j, iii, result;
+	char outd[1000];
+	char crprn[1000];
+	strcpy(outd, PROCPATH("outd"));
+	strcpy(crprn, "integrals.txt");
+	pInts pInt1;
+	double blindregions[10] = {12.30, 11.00, 10.28, 9.67, 9.53, 8.33, 7.93, 6.16, 4.05, 0.49};
+	double tmpRngs[16] = {12.037, 11.208, 10.295, 9.607, 9.422, 8.694, 7.927, 7.277, 7.204, 7.123, 7.277, 6.854, 6.854, 6.360, 2.064, 0.630};  
+	int bls = sizeof(blindregions)/sizeof(blindregions[0]);
+	int irs = (sizeof(tmpRngs)/sizeof(tmpRngs[0]))/2;
+	
+	// Reference and Baseline Correction //
+	makeBC(blindregions, bls);
+	//char bcArg[5];
+	//itoa(bls, bcArg, 10);
+	XCMD("sref");
+	XAU("linspl", "");
+
+
+	// Integration //
+	pInt1.regionsArSize = irs; //just used to iter rows
+	pInt1.intValuesSize = irs;
+	pInt1.curdat = curdat;
+	pInt1.intValues = (double*)malloc(irs * sizeof(double));
+	pInt1.outd = outd;
+	pInt1.crprn = crprn;  
+	pInts *ppin = & pInt1;
+	regionsInit(ppin, irs, tmpRngs);	
+	calcIntegrals(ppin);
+  
+	// calculate mole percentages //
+	struct composition comp;
+	double bpa, ald, bpawt, aldwt, total, totalwt;
+	
+	bpa = pInt1.intValues[5]/4;
+	ald = (pInt1.intValues[7] - (6 * bpa))/18;
+
+	total = bpa + ald;
+	
+	
+	comp.bpa = 100 * pga/total;  
+	comp.ald = 100 * gly/total;  
+	
+	bpawt = comp.bpa * 228.29
+	aldwt = comp.ald * 234.33
+	totalwt = bpawt + aldwt;
+	
+	comp.bpawt = 100 * bpawt/totalwt;
+	comp.aldwt = 100 * aldwt/totalwt;
+
+	comp.linewidth = XAU("pwhh", "2.50", "bgnd"); //run command in background so it return the linewidth value
+
+	//  Print Data Sheet to accompany the current spectra //	
+	makeOut(printComp, comp, curdat); 
+	pPrinter(curdat);
+
+  //  garbage collection  //
+	for (i = 0; i < irs; i++)
+	{
+		free(pInt1.regionsAr[i]);
+	}
+	free(pInt1.regionsAr);
+	free(pInt1.intValues);	
+	
+	return 0;
+}
+

@@ -1,0 +1,78 @@
+/* potter 19Sep2024 */
+/* example1: calculates composition of 3-methyl solvent */
+/* potter 22Oct2024 refactored to introduce integral struct and remove makeInteg() function with large parameter list */
+/*--------------------------*/
+
+AUERR = ex1Proc(curdat, cmd);
+QUIT
+
+#include <ex1Comp.c>
+#include <pBC.c>
+#include <pInteg.c>
+#include <pOut.c>
+#include <pPrint.c>
+#include <pstats.c>
+
+static int pdsProc(const char* curdat, const char* cmd)
+{
+	STOREPAR("LAYOUT", "+/PROTON_Ethicon.xwp");
+	STOREPAR("LB",0.2);
+	char outd[1000];
+	char crprn[1000];
+	strcpy(outd, PROCPATH("outd"));
+	strcpy(crprn, "integrals.txt");	
+	double blindregions[12] = {8.459, 8.355, 7.606, 6.277, 5.230, 4.295, 2.900, 1.608, 1.173, 1.107, 1.061, 1.004};
+	double tmpRngs[14] = {8.587, 8.427, 7.737, 6.99, 6.99, 6.327, 2.777, 2.317, 2.257, 1.767, 1.267, 1.217, 1.167, 1.097};
+	int bls = sizeof(blindregions)/sizeof(blindregions[0]);
+	int irs = (sizeof(tmpRngs)/sizeof(tmpRngs[0]))/2;
+	
+	// Reference and Baseline Correction //
+	makeBC(blindregions, bls);
+	XCMD("sref");
+	XAU("linspl", "");
+
+	// Integration //
+	pInts pInt1;
+	pInt1.regionsArSize = irs; //just used to iter rows
+	pInt1.intValuesSize = irs;
+	pInt1.curdat = curdat;
+	pInt1.intValues = (double*)malloc(irs * sizeof(double));
+	pInt1.outd = outd;
+	pInt1.crprn = crprn;  
+	pInts *ppin = & pInt1;
+	regionsInit(ppin, irs, tmpRngs);	
+	calcIntegrals(ppin);
+  
+	// calculate mole percentages //
+	double nMFA, nAA, mfawt, aawt, total, totalwt;
+	struct composition comp;
+	nMFA = (pInt1.intValues[3])/3;    
+	nAA = (pInt1.intValues[4])/3;    
+	total = nMFA + nAA;
+	comp.mfa = (nMFA/total)*100;
+	comp.aa = (nAA/total)*100;	
+	
+	mfawt = comp.mfa * 234.33; // mw 3,5-ditert-butyl-2-hydroxybenzaldehyde
+	aawt = comp.aa * 60.05; // mw acetic acid 60.05
+	totalwt = mfawt + aawt;
+	comp.mfawt = mfawt/totalwt;
+	comp.aawt = aawt/totalwt;
+	
+	comp.linewidth = XAU("pwhh", "4.8", "bgnd"); //run command in background so it return the linewidth value
+
+	//  Print Data Sheet to accompany the current spectra //	
+	makeOut(printComp, comp, curdat); 
+	pPrinter(curdat);
+
+  //  garbage collection  //
+  int i;
+	for (i = 0; i < irs; i++)
+	{
+		free(pInt1.regionsAr[i]);
+	}
+	free(pInt1.regionsAr);
+	free(pInt1.intValues);	
+	
+	return 0;
+}
+

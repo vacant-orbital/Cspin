@@ -1,0 +1,183 @@
+AUERR = getpwhh(curdat, cmd);
+QUIT
+
+#include <baselineDef.c>
+#include <subregion.c>
+#include <specInfo.c> 
+	
+static int getpwhh(const char* curdat, const char* cmd)
+{
+	float z[1000];
+	int zsize; //unknown at compile time. set after filling
+	int i, ii, iii, iiii;
+	float offset; //needed for datatype preservation when pulling from bruker parameter 
+	char dummystr[PATH_MAX];
+	float intleft, intright;
+	int leftpoint, rightpoint;
+	int minsize;
+	FILE *fptr;
+	FILE *intfile;
+	SPI spcInf;
+	double lefthz, righthz;
+	 
+	int indexOf(double peakShift, SPI spi)
+	{
+		return spi.si*((spi.left - peakShift)/(spi.sw_p/spi.sf));
+	} 
+
+	double toHz(long indx, SPI spi, double lft)// should be named toHz()
+	{
+		//return spcInf.sw_p - (indx * (spcInf.sw_p/spi.si));  //sw_p is 7142.86
+		//return (leftHz(spi) - (indx * (spi.sw_p/spi.si)));
+		//printf("indx: %d\n", indx);
+		//printf("to Hz spi values: spi.sw_p %f, spi.si %d, quotient: %f\n", spi.sw_p, spi.si, spi.sw_p/spi.si);
+		return lft - (indx * (spi.sw_p/spi.si));
+	}
+	
+	double toPPM(long indx, SPI spi)
+	{
+		return 	(spi.left - (indx * ((spi.left - spi.right)/spi.si)));
+	}
+
+	if (access(PROCPATH("1r"),F_OK)!=0)
+	{
+		Proc_err(0,"no processed data.");
+		return(-1);
+	}
+	
+	int origprocno=procno;
+	//save copy of initial spectrum in PROCNO 40 
+	
+	//printf("argument: %s\n", i_argv[2]);
+	FETCHPARS("SI",&spcInf.si);
+	minsize = spcInf.si/500;
+
+	FETCHPARS("OFFSET",&spcInf.offset);
+	FETCHPARS("SW_p",&spcInf.sw_p);
+	FETCHPARS("SF",&spcInf.sf);
+	spcInf.left = spcInf.offset; //ppm value of leftmostpoint
+	spcInf.right = spcInf.left - (spcInf.sw_p / spcInf.sf); //ppmvalue of rightmostpoint ~ -2.94 ppm for a typical spectrum
+	// save x, y (average), index information in a linked list of type SR
+//	regionsizeppm = blSWppm/num_regions;
+	lefthz = spcInf.left * spcInf.sf;
+	righthz = spcInf.right * spcInf.sf;
+	//printf("spcInf.left: %g spcInf.right: %g\n", spcInf.left, spcInf.right);
+	//printf("spcInf.si: %g
+	
+	FILE *datafile;
+	long  *pld; 
+	long *ldata; // use this pointer to store reals
+	int readin;
+	int cant_modify_1r=0;
+	if ( ( ldata = (long *)malloc(sizeof(long) * spcInf.si ) )==NULL )
+	//if ( ( ldata = (long *)malloc(sizeof(long) * si ) )==NULL )
+	{
+		Proc_err(0,"Could not allocate memory for data?");
+		cant_modify_1r=1;
+	}
+	
+	if ( ( datafile = fopen(PROCPATH("1r"), "r+") ) == NULL)
+	{
+		Proc_err(INFO_OPT, "Could not open data file %s for read/write - ignored", PROCPATH("1r"));
+		cant_modify_1r=1;
+	}
+	else if ( (readin = fread(ldata, sizeof(int), spcInf.si, datafile)) != spcInf.si)
+	{
+		Proc_err(INFO_OPT, "read only %d of %d points from %s - ignored", readin, spcInf.si, PROCPATH("1r"));
+		fclose(datafile);
+		cant_modify_1r=1;
+	}
+	double userShift;
+	char *tmpPtr;
+	if ((i_argv[2] != NULL)&&(i_argv[2] != 0))
+	{
+		//userShift = strtod(i_argv[2], &tmpPtr);
+		userShift = strtod(i_argv[2], &tmpPtr);
+	}
+	else 
+	{
+		userShift = 0.0;
+	}
+	//printf("i_argv[2]: %s userShift: %g\n", i_argv[2], userShift);
+	
+	long lowI = indexOf(userShift + 0.1, spcInf);
+	long highI = indexOf(userShift - 0.1, spcInf);
+	long mx = 0;
+	long mxi = 0;
+	long delmx = 100000000;
+	long lft = 0;
+	long lfti = 0;
+	long rt = 0;
+	long rti = 0;
+	i=0;	
+	for (i = lowI; i < highI; i++)
+	{
+		//printf("i: %d  ldata[i]: %d\n", i, ldata[i]); 
+		//printf("%g, %ld\n", toPPM(i, spcInf), ldata[i]);
+		if (ldata[i] > mx)
+		{
+			mx = ldata[i];
+			mxi = i;
+			//printf("i: %d  chemical shift: %g, intensity: %ld\n", i, toPPM(i, spcInf), ldata[i]);
+		}
+	}
+	//printf("10**2: %f\n", pow(10.0, 2.0));
+	i=0;
+	//printf("scanning from ldata[
+	for (i = lowI; i < mxi; i++)
+	{
+		//printf("i: %d\n", i);
+		//if (pow(pow((ldata[i] - (mx/2.0)), 2.0), 0.5) < delmx)
+		//printf("i: %d  chemical shift: %g\n", i, toPPM(i, spcInf));
+		if (abs(ldata[i] - (mx/2.0)) < delmx)
+		{
+			lft = ldata[i];
+			lfti = i;
+			//printf("OK\n");
+			//delmx = (ldata[i] - (mx/2.0));
+			//delmx = pow(pow((ldata[i] - (mx/2.0)), 2.0), 0.5);
+			delmx = abs(ldata[i] - (mx/2.0));
+			//printf("i: %d, ldata[1]: %d, halfMax: %d, delta: %d, chemical shift: %g\n", i, ldata[i], mx/2, delmx, toPPM(i, spcInf));
+		}
+	}
+	//printf("delmx: %ld\n", delmx);
+	delmx = 100000000;
+	i=0;
+	for (i = mxi; i < highI; i++)
+	{
+		//if (pow(pow(ldata[i] - (mx/2.0), 2.0), 0.5) < delmx)
+		if (abs(ldata[i] - (mx/2.0)) < delmx)
+		{
+			rt = ldata[i];
+			rti = i;
+			//printf("KO");
+			//delmx = pow(pow((ldata[i] - (mx/2.0)), 2.0), 0.5);
+			//delmx = ldata[i] - (mx/2.0);
+			delmx = abs(ldata[i] - (mx/2.0));
+			//printf("i: %d, ldata[1]: %d, halfMax: %d, delta: %d, chemical shift: %g\n", i, ldata[i], mx/2, delmx, toPPM(i, spcInf));
+		}
+	}	
+	//printf("second delmx: %ld\n", delmx);
+	//printf("Here are the low: %ld, (%d) and high: %ld, (%d) indices for iteration\n", lowI, ldata[lowI], highI, ldata[highI]);
+	//printf("Here are the low: %ld,  and high: %ld, Hz values for iteration\n", toHz(lowI, spcInf, lefthz),  toHz(highI, spcInf, lefthz));
+	//printf("mx: %ld\n", mx);
+	//printf("mxi: %ld\n", mxi);
+	//printf("lft: %ld at %g ppm\n", lft, toPPM(lfti, spcInf));
+	//printf("lfti: %ld at %g ppm\n", lfti, toPPM(lfti, spcInf));
+	//printf("rt: %ld at %g ppm\n", rti, toPPM(rti, spcInf));
+	//printf("rti: %ld at %g ppm\n", rti, toPPM(rti, spcInf));
+  fclose(datafile);
+  //printf("pwhh: %f\n", toHz(lfti, spcInf) - toHz(rti, spcInf));
+	if ((i_argv[3] != NULL)&&(i_argv[3] != 0))
+	{
+		return toHz(lfti, spcInf, lefthz) - toHz(rti, spcInf, lefthz));
+	}
+	else 
+	{
+		printf("pwhh: %g\n", toHz(lfti, spcInf, lefthz) - toHz(rti, spcInf, lefthz));
+		return 0;
+	}
+}
+
+ 
+

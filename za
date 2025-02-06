@@ -1,0 +1,66 @@
+AUERR = local_au(curdat, cmd);
+QUIT
+
+#import <pTools.c>
+#include <pInteg.c>
+#include <quicksort2D_reverse_double_DMA.c>
+
+static int local_au(const char *curdat, const char* cmd)
+{
+	/*
+	1) create an array called allrows, 2) fill it with the current start, stop values from "instrng"
+	3) append values passed as command line args  4) sort the resulting 5) cz -- clear integrals 5) reintegrate with values
+	from allrows
+	*/
+	int i, j;
+	double **allrows;
+	int allrowsSize;
+	double *intvalues;	
+	double intTotal = 0;
+	char outd[1000];
+	char crprn[1000];
+	strcpy(outd, PROCPATH("outd"));
+	strcpy(crprn, "integrals.txt");
+	pInts pInt1;
+	
+
+	allrowsSize = (getNumIntPoints() + i_argc - 2)/2;
+	//printf("allrowsSize: %d\n", allrowsSize);
+	allrows = (double**)malloc(allrowsSize * sizeof(double *));
+	for (i = 0; i < allrowsSize; i++)
+	{
+		allrows[i] = (double*)malloc(2 * sizeof(double));
+	}
+	getIntegrals2D(allrows); //fills up allrows with preexisting [start, stop] values
+	j = 2;	
+	for (i = getNumIntPoints()/2; i < allrowsSize; i++)  // append values passed as command line args 
+	{
+		allrows[i][0] = atof(i_argv[j]);
+		j = j + 1;
+		allrows[i][1] = atof(i_argv[j]);
+		j = j + 1;
+	}	
+	
+	quicksort(allrows, allrowsSize);
+	intvalues = (double*)malloc(allrowsSize * sizeof(double));
+	pInt1.curdat = curdat;
+	pInt1.regionsAr = allrows;
+	pInt1.regionsArSize = allrowsSize;
+	pInt1.intValuesSize = allrowsSize;  //uncommenting this allows the next to last for loop of recalcinteg to run and crashes the program
+	pInt1.intValues = intvalues;
+	pInt1.outd = outd;
+	pInt1.crprn = crprn;
+	XAU("cz", "");
+	calcIntegrals(pInt1);
+	
+	for (i = 0; i < allrowsSize; i++)
+	{
+		free(allrows[i]);
+	}
+	free(allrows);
+	free(intvalues);
+	//LI;
+	VIEWDATA_SAMEWIN;
+	XCMD("sendgui browse_update_tree");
+	return 0;
+}
