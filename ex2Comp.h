@@ -1,5 +1,5 @@
-#ifndef VCALCOMP_H
-#define VCALCOMP_H
+#ifndef EX2COMP_H
+#define EX2COMP_H
 
 struct composition {
 	double bpa;

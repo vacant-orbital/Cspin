@@ -1,5 +1,5 @@
-#ifndef ex1COMP_H
-#define ex1COMP_H
+#ifndef EX1COMP_H
+#define EX1COMP_H
 
 struct composition {
 	double mfa;

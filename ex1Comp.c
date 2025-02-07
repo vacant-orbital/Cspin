@@ -1,4 +1,4 @@
-#include <pdsComp.h>
+#include <ex1Comp.h>
 
 void printComp(FILE *of, struct composition cs){
 	fprintf(of,"\n\nMole Percent Composition");
