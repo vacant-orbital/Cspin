@@ -13,7 +13,7 @@ QUIT
 #include <pPrint.c>
 #include <pstats.c>
 
-static int pdsProc(const char* curdat, const char* cmd)
+static int ex1Proc(const char* curdat, const char* cmd)
 {
 	STOREPAR("LAYOUT", "+/PROTON_Ethicon.xwp");
 	STOREPAR("LB",0.2);
@@ -28,7 +28,7 @@ static int pdsProc(const char* curdat, const char* cmd)
 	
 	// Reference and Baseline Correction //
 	makeBC(blindregions, bls);
-	XCMD("sref");
+	XCMD("sref 4.8");
 	XAU("linspl", "");
 
 	// Integration //
@@ -55,10 +55,11 @@ static int pdsProc(const char* curdat, const char* cmd)
 	mfawt = comp.mfa * 234.33; // mw 3,5-ditert-butyl-2-hydroxybenzaldehyde
 	aawt = comp.aa * 60.05; // mw acetic acid 60.05
 	totalwt = mfawt + aawt;
-	comp.mfawt = mfawt/totalwt;
-	comp.aawt = aawt/totalwt;
-	
-	comp.linewidth = XAU("pwhh", "4.8", "bgnd"); //run command in background so it return the linewidth value
+	comp.mfawt = 100*(mfawt/totalwt);
+	comp.aawt = 100*(aawt/totalwt);
+
+	double expectedShift = 4.80;	
+	comp.linewidth = solventWidth(expectedShift, curdat); //if tms present replace this line with     comp.linewidth = peakWidth(curdat);
 
 	//  Print Data Sheet to accompany the current spectra //	
 	makeOut(printComp, comp, curdat); 
